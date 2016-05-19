@@ -36,7 +36,7 @@ function Invoke-Plaster {
 
         try {
             if ((!$TemplatePath -or
-                !($manifestPath = Join-Path $TemplatePath 'plasterManifest.xml') -or
+                    !($manifestPath = Join-Path $TemplatePath 'plasterManifest.xml') -or
                 !(Test-path $manifestPath))
             ) {
                 return
@@ -274,10 +274,10 @@ function Invoke-Plaster {
                 $content = Get-Content $Path -Raw
                 $pattern = '(<%=)(.*?)(%>)'
                 $newContent = [regex]::Replace($content, $pattern, {
-                    param($match)
-                    $expr = $match.groups[2].value
-                    Write-Verbose "Replacing template expr $expr in '$Path'"
-                    ExpandString $expr
+                        param($match)
+                        $expr = $match.groups[2].value
+                        Write-Verbose "Replacing template expr $expr in '$Path'"
+                        ExpandString $expr
                 },  @('IgnoreCase', 'SingleLine', 'MultiLine'))
 
                 Set-Content -Path $Path -Value $newContent -Encoding $encoding
@@ -389,8 +389,23 @@ function Invoke-Plaster {
             }
         }
         
-        function ExecuteTask([ValidateNotNull()]$ExecutNode) {
+        function ExecuteTask([ValidateNotNull()]$ExecuteNode) {
+            $srcRelPath = ExpandString $ExecuteNode.source
+            $condition  = $ExecuteNode.condition
+            $type = $ExecuteNode.type
+            if ($condition) {
+                if (!(EvaluateCondition $condition)) {
+                    Write-Verbose "Skipping file '$dstRelPath', condition evaluated to false."
+                    return
+                }
+            }
+            $srcPath = $PSCmdlet.GetUnresolvedProviderPathFromPSPath((Join-Path $TemplatePath $srcRelPath))
             
+            switch ($type) {
+                'psakeTask' { Invoke-psake -buildFile $srcPath -taskList $ExecuteNode.task -parameters (@{'params' = $ExecuteNode.parameters})}
+                'script' {& $srcPath $ExecuteNode.parameters}
+                'scriptfunction' { & { . $srcPath; & (ExpandString $ExecuteNode.function) (@{'params' = $ExecuteNode.parameters})  } }
+            }
         }
     }
 
@@ -407,7 +422,7 @@ function Invoke-Plaster {
         }
 
         Write-Verbose "Parameters are:"
-#        Write-Verbose "$($parameters | Out-String)"
+        #        Write-Verbose "$($parameters | Out-String)"
         Write-Verbose "$(Get-Variable -Name PLASTER_* | Out-String)"
 
         # Process content

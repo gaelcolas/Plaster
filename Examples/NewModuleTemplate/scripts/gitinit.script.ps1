@@ -1,1 +1,1 @@
-﻿
+﻿'Just running gitinit.script' | Write-Host
