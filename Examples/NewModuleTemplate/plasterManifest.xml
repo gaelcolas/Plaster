@@ -46,6 +46,17 @@
                     help="No license specified."
                     value="None"/>
         </parameter>
+        <parameter name='execute' type='multichoice' default='' prompt='executes powershell code'>
+            <choice label='&amp;script'
+                    help="Executes a script"
+                    value="gitinit.script"/>
+            <choice label='&amp;PsakeTask'
+                    help="Executes a PsakeTask"
+                    value="gitinit.psakeTask"/>
+            <choice label='&amp;function'
+                    help="Executes a function within a script"
+                    value="gitinit.function"/>
+        </parameter>
     </parameters>
     <dependencies>
         <dependency id="another-template-id??"/>
@@ -115,5 +126,31 @@
         },$1]]>
             </replacement>
         </modify>
+        <execute source='scripts\gitinit.psakeTask.ps1'
+                 type='psakeTask'
+                 Task='gitinit'
+                 condition='$PLASTER_PARAM_execute -contains "gitinit.psakeTask"'>
+                 <parameters>
+                     <parameter name='ModuleName' value='${PLASTER_PARAM_ModuleName}'/>
+                     <parameter name='Version' value='${PLASTER_PARAM_Version}'/>
+                 </parameters>
+        </execute>
+        <execute source='scripts\gitinit.script.ps1'
+                 type='script'
+                 condition='$PLASTER_PARAM_execute -contains "gitinit.script"'>
+                 <parameters>
+                     <parameter name='ModuleName' value='${PLASTER_PARAM_ModuleName}'/>
+                     <parameter name='Version' value='${PLASTER_PARAM_Version}'/>
+                 </parameters>
+        </execute>
+        <execute source='scripts\gitinit.scriptfunction.ps1'
+                 type='scriptfunction'
+                 function='Initialize-gitrepo'
+                 condition='$PLASTER_PARAM_execute -contains "gitinit.function"'>
+                 <parameters>
+                     <parameter name='ModuleName' value='${PLASTER_PARAM_ModuleName}'/>
+                     <parameter name='Version' value='${PLASTER_PARAM_Version}'/>
+                 </parameters>
+        </execute>
     </content>
 </plasterManifest>

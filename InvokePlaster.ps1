@@ -382,6 +382,10 @@ function Invoke-Plaster {
                 }
             }
         }
+        
+        function ExecuteTask([ValidateNotNull()]$ExecutNode) {
+            
+        }
     }
 
     end {
@@ -408,6 +412,7 @@ function Invoke-Plaster {
                 'file'              { ProcessFile $node; break }
                 'modify'            { ModifyFile $node; break }
                 'newModuleManifest' { GenerateModuleManifest $node; break }
+                'execute'           { ExecuteTask $node; break }
                 default             { throw ($LocalizedData.UnrecognizedContentElement_F1 -f $node.LocalName) }
             }
         }
