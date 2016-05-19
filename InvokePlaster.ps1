@@ -36,7 +36,7 @@ function Invoke-Plaster {
 
         try {
             if ((!$TemplatePath -or
-                    !($manifestPath = Join-Path $TemplatePath 'plasterManifest.xml') -or
+                !($manifestPath = Join-Path $TemplatePath 'plasterManifest.xml') -or
                 !(Test-path $manifestPath))
             ) {
                 return
@@ -274,10 +274,10 @@ function Invoke-Plaster {
                 $content = Get-Content $Path -Raw
                 $pattern = '(<%=)(.*?)(%>)'
                 $newContent = [regex]::Replace($content, $pattern, {
-                        param($match)
-                        $expr = $match.groups[2].value
-                        Write-Verbose "Replacing template expr $expr in '$Path'"
-                        ExpandString $expr
+                    param($match)
+                    $expr = $match.groups[2].value
+                    Write-Verbose "Replacing template expr $expr in '$Path'"
+                    ExpandString $expr
                 },  @('IgnoreCase', 'SingleLine', 'MultiLine'))
 
                 Set-Content -Path $Path -Value $newContent -Encoding $encoding
@@ -422,7 +422,7 @@ function Invoke-Plaster {
         }
 
         Write-Verbose "Parameters are:"
-        #        Write-Verbose "$($parameters | Out-String)"
+#        Write-Verbose "$($parameters | Out-String)"
         Write-Verbose "$(Get-Variable -Name PLASTER_* | Out-String)"
 
         # Process content
