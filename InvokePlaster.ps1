@@ -11,9 +11,10 @@
 #>
 function Invoke-Plaster {
     [System.Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Scope='Function', Target='GenerateModuleManifest')]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Scope='Function', Target='ProcessFile')]
     [System.Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Scope='Function', Target='ProcessTemplate')]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Scope='Function', Target='ModifyContent')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Scope='Function', Target='ModifyFile')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Scope='Function', Target='ProcessFile')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage('PSAvoidShouldContinueWithoutForce', '', Scope='Function', Target='ProcessFile')]
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
         # Specifies the path to either the Template directory or a ZIP file containing the template.
@@ -35,14 +36,14 @@ function Invoke-Plaster {
         $Force
     )
 
+    # Process the template's plaster manifest file to convert parameters defined there into dynamic parameters.
     dynamicparam {
         $paramDictionary = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
-        $origTemplatePath = $DestinationPath
         $manifest = $null
         $manifestPath = $null
 
-        # Can't process dynamic parameters if we have no TemplatePath
         if ($null -eq $TemplatePath) {
+            # Can't process dynamic parameters if we have no TemplatePath
             return
         }
 
@@ -125,14 +126,14 @@ function Invoke-Plaster {
         $confirmYesToAll = $false
         $confirmNoToAll = $false
 
-        InitializePredefinedVariables
+        InitializePredefinedVariables $PSCmdlet.GetUnresolvedProviderPathFromPSPath($DestinationPath)
 
         # If user does not supply the TemplatePath parameter, the dynamicparam scriptblock bails early without
-        # loading anything.  So get the manifestPath here.
+        # loading the Plaster manifest.  If that's the case, load the manifest now.
         if ($null -eq $manifestPath) {
             $TemplatePath = ExtractTemplateAndReturnPath $TemplatePath
             $manifestPath = Join-Path $TemplatePath plasterManifest.xml
-            $manifestPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($manifestPath)
+            $manifestPath = $PSCmdlet.GetUnresolvedProviderPathFromPSPath($manifestPath)
         }
 
         # Validate that the dynamicparam scriptblock was able to load the template manifest and it is valid.
@@ -243,7 +244,7 @@ function Invoke-Plaster {
                 }
             }
 
-            # Make user defined parameters available as a PowerShell variable PLASTER_PARAM_<parameterName>
+            # Make template defined parameters available as a PowerShell variable PLASTER_PARAM_<parameterName>
             Set-Variable -Name "PLASTER_PARAM_$name" -Value $value -Scope Script
         }
 
@@ -254,7 +255,7 @@ function Invoke-Plaster {
             $dstRelPath = ExpandString $NewModuleManifestNode.destination
             $dstPath = $PSCmdlet.GetUnresolvedProviderPathFromPSPath((Join-Path $DestinationPath $dstRelPath))
 
-            $condition  = $FileNode.condition
+            $condition  = $NewModuleManifestNode.condition
             if ($condition) {
                 if (!(EvaluateCondition $condition)) {
                     Write-Verbose "Skipping module manifest generation for '$dstPath', condition evaluated to false."
@@ -273,6 +274,10 @@ function Invoke-Plaster {
                     Write-Verbose "Creating destination dir for module manifest: $manifestDir"
                     New-Item $manifestDir -ItemType Directory > $null
                 }
+
+                # TODO: Temporary - remove this when this function makes use of ProcessFile
+                WriteOperationStatus 'Create' (ConvertToDestinationRelativePath $dstPath)
+
                 New-ModuleManifest -Path $dstPath -ModuleVersion $moduleVersion -RootModule $rootModule -Author $author
                 $content = Get-Content -LiteralPath $dstPath -Raw
                 Set-Content -LiteralPath $dstPath -Value $content -Encoding UTF8
@@ -451,9 +456,8 @@ function Invoke-Plaster {
             }
         }
 
-        Write-Verbose "Parameters are:"
-#        Write-Verbose "$($parameters | Out-String)"
-        Write-Verbose "$(Get-Variable -Name PLASTER_* | Out-String)"
+        $parameters = Get-Variable -Name PLASTER_* | Out-String
+        Write-Verbose "Parameter values are:`n$($parameters -split "`n")"
 
         # Process content
         foreach ($node in $manifest.plasterManifest.content.ChildNodes) {
@@ -470,17 +474,21 @@ function Invoke-Plaster {
     }
 }
 
-function InitializePredefinedVariables {
-    Set-Variable -Name PLASTER_GUID1 -Value ([Guid]::NewGuid()) -Scope Script
-    Set-Variable -Name PLASTER_GUID2 -Value ([Guid]::NewGuid()) -Scope Script
-    Set-Variable -Name PLASTER_GUID3 -Value ([Guid]::NewGuid()) -Scope Script
-    Set-Variable -Name PLASTER_GUID4 -Value ([Guid]::NewGuid()) -Scope Script
-    Set-Variable -Name PLASTER_GUID5 -Value ([Guid]::NewGuid()) -Scope Script
+function InitializePredefinedVariables([string]$destPath) {
+    $destName = Split-Path -Path $destPath -Leaf
+    Set-Variable -Name PLASTER_DestinationPath -Value $destPath.TrimEnd('\','/') -Scope Script
+    Set-Variable -Name PLASTER_DestinationName -Value $destName -Scope Script
+
+    Set-Variable -Name PLASTER_Guid1 -Value ([Guid]::NewGuid()) -Scope Script
+    Set-Variable -Name PLASTER_Guid2 -Value ([Guid]::NewGuid()) -Scope Script
+    Set-Variable -Name PLASTER_Guid3 -Value ([Guid]::NewGuid()) -Scope Script
+    Set-Variable -Name PLASTER_Guid4 -Value ([Guid]::NewGuid()) -Scope Script
+    Set-Variable -Name PLASTER_Guid5 -Value ([Guid]::NewGuid()) -Scope Script
 
     $now = [DateTime]::Now
-    Set-Variable -Name PLASTER_DATE -Value ($now.ToShortDateString()) -Scope Script
-    Set-Variable -Name PLASTER_TIME -Value ($now.ToShortTimeString()) -Scope Script
-    Set-Variable -Name PLASTER_YEAR -Value ($now.Year) -Scope Script
+    Set-Variable -Name PLASTER_Date -Value ($now.ToShortDateString()) -Scope Script
+    Set-Variable -Name PLASTER_Time -Value ($now.ToShortTimeString()) -Scope Script
+    Set-Variable -Name PLASTER_Year -Value ($now.Year) -Scope Script
 }
 
 function ExpandString($str) {
