@@ -422,6 +422,13 @@ function Invoke-Plaster {
             }
         }
         
+        function ProcessTaskParameters([ValidateNotNull()]$ParamNode) {
+            $ExtractedParams = [ordered]@{}
+            foreach($parameter in $ExecuteNode.ChildNodes.parameter) {
+                $ExtractedParams.add($parameter.name,(ExpandString $parameter.value.ToString()))
+            }
+            return [hashtable]$ExtractedParams
+        }
         function ExecuteTask {
             [CmdletBinding(ConfirmImpact="High")]
             param([ValidateNotNull()]$ExecuteNode)
@@ -437,10 +444,11 @@ function Invoke-Plaster {
             $srcPath = $PSCmdlet.GetUnresolvedProviderPathFromPSPath((Join-Path $TemplatePath $srcRelPath))
             
             if ($pscmdlet.ShouldProcess('Plaster Execute Nodes', "CAREFUL! Executing task $type from $srcPath")) {
+                $ExtractedParams = ProcessTaskParameters $ExecuteNode
                 switch ($type) {
-                    'psakeTask' { Invoke-psake -buildFile $srcPath -taskList $ExecuteNode.task -parameters (@{'params' = $ExecuteNode.parameters})}
-                    'script' {& $srcPath $ExecuteNode.parameters}
-                    'scriptfunction' { & { . $srcPath; & (ExpandString $ExecuteNode.function) (@{'params' = $ExecuteNode.parameters})  } }
+                    'psakeTask' { Invoke-psake -buildFile $srcPath -taskList $ExecuteNode.task -parameters ($ExtractedParams)}
+                    'script' {& $srcPath @ExtractedParams}
+                    'scriptfunction' { & { . $srcPath; & (ExpandString $ExecuteNode.function) @ExtractedParams  } }
                 }
             }
         }
