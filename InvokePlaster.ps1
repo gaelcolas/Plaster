@@ -238,6 +238,13 @@ function Invoke-Plaster {
             $store = $ParamNode.store
             $prompt = ExpandString $ParamNode.prompt
             $default = ExpandString $ParamNode.default
+            $condition  = $ParamNode.condition
+            if ($condition) {
+                if (!(EvaluateCondition $condition)) {
+                    Write-Verbose "Skipping parameter '$name', condition evaluated to false."
+                    return
+                }
+            }
 
             if (!$name) {
                 throw ($LocalizedData.ManifestMissingAttribute_F2 -f $ParamNode.LocalName, 'name')
@@ -355,6 +362,7 @@ function Invoke-Plaster {
                 New-ModuleManifest -Path $dstPath -ModuleVersion $moduleVersion -RootModule $rootModule -Author $author
                 $content = Get-Content -LiteralPath $dstPath -Raw
                 Set-Content -LiteralPath $dstPath -Value $content -Encoding UTF8
+
             }
         }
 
@@ -383,7 +391,14 @@ function Invoke-Plaster {
                     ExpandString $expr
                 },  @('IgnoreCase', 'SingleLine', 'MultiLine'))
 
-                Set-Content -Path $Path -Value $newContent -Encoding $encoding
+                if ($encoding -ne 'UTF8-NOBOM') {
+                    Set-Content -Path $Path -Value $newContent -Encoding $encoding
+                }
+                else {
+                    $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
+                    [System.IO.File]::WriteAllLines($Path, $newContent, $Utf8NoBomEncoding)
+                }
+                
             }
         }
 
@@ -481,8 +496,8 @@ function Invoke-Plaster {
                         'replacement' {
                             # TODO: Support expand on pattern / replacement string needs some thinking - might need to escape double quotes.
                             $pattern = $node.pattern # ExpandString $node.pattern
-                            $replacement = $node.InnerText # ExpandString $node.InnerText
-
+                            $replacement = ExpandString ($node.InnerText -replace "(\`$\d+)",'```$1') # ExpandString $node.InnerText
+                            $replacement | Write-Host
                             $PLASTER_FileContent = $PLASTER_FileContent -replace $pattern,$replacement
 
                             $modified = $true
@@ -492,7 +507,13 @@ function Invoke-Plaster {
                 }
 
                 if ($modified) {
-                    Set-Content -LiteralPath $filePath -Value $PLASTER_FileContent -Encoding $encoding
+                    if ($encoding -ne 'UTF8-NOBOM') {
+                        Set-Content -LiteralPath $filePath -Value $PLASTER_FileContent -Encoding $encoding
+                    }
+                    else {
+                        $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
+                        [System.IO.File]::WriteAllLines($filePath, $PLASTER_FileContent, $Utf8NoBomEncoding)
+                    }
                 }
             }
         }
