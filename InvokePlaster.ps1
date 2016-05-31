@@ -496,7 +496,6 @@ function Invoke-Plaster {
                             # TODO: Support expand on pattern / replacement string needs some thinking - might need to escape double quotes.
                             $pattern = $node.pattern # ExpandString $node.pattern
                             $replacement = ExpandString ($node.InnerText -replace "(\`$\d+)",'```$1') # ExpandString $node.InnerText
-                            $replacement | Write-Host
                             $PLASTER_FileContent = $PLASTER_FileContent -replace $pattern,$replacement
 
                             $modified = $true
