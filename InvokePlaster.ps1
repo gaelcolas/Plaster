@@ -362,7 +362,6 @@ function Invoke-Plaster {
                 New-ModuleManifest -Path $dstPath -ModuleVersion $moduleVersion -RootModule $rootModule -Author $author
                 $content = Get-Content -LiteralPath $dstPath -Raw
                 Set-Content -LiteralPath $dstPath -Value $content -Encoding UTF8
-
             }
         }
 
@@ -396,7 +395,7 @@ function Invoke-Plaster {
                 }
                 else {
                     $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
-                    [System.IO.File]::WriteAllLines($Path, $newContent, $Utf8NoBomEncoding)
+                    [System.IO.File]::WriteAllText($Path, $newContent, $Utf8NoBomEncoding)
                 }
                 
             }
@@ -512,7 +511,7 @@ function Invoke-Plaster {
                     }
                     else {
                         $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
-                        [System.IO.File]::WriteAllLines($filePath, $PLASTER_FileContent, $Utf8NoBomEncoding)
+                        [System.IO.File]::WriteAllText($filePath, $PLASTER_FileContent, $Utf8NoBomEncoding)
                     }
                 }
             }
